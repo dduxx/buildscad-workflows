@@ -1,13 +1,6 @@
 # buildscad-workflows
 
-Shared [GitHub reusable workflows](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) for [buildscad](https://github.com/dduxx/buildscad)-based OpenSCAD projects.
-
-Used by:
-
-- [dfCharacterBuilder](https://github.com/dduxx/dfCharacterBuilder)
-- [twoPointFiveD](https://github.com/dduxx/twoPointFiveD)
-- [baseGenerator](https://github.com/dduxx/baseGenerator)
-- [osrsIconPixelModels](https://github.com/dduxx/osrsIconPixelModels)
+Shared GitHub reusable workflows for [buildscad](https://github.com/dduxx/buildscad)-based OpenSCAD projects.
 
 ## Workflows
 
@@ -37,13 +30,12 @@ Used by:
 
 ## Usage
 
-Add a thin wrapper workflow to each project that calls the shared workflow here. Because these workflows are invoked with `uses:`, this repository must be accessible (public) to the consuming repositories.
-
-Pin each `uses:` reference to an exact release tag (e.g. `@v1.2.3`) for stability. Tags are immutable; see [Semantic-release](#semantic-release) below.
+Add a thin wrapper workflow to each project that calls the shared workflow here.
 
 ### CI
 
-For projects that build (e.g. `baseGenerator`, `osrsIconPixelModels`):
+Often used for projects that need to execute the build as part of a PR for testing and confirming
+that the changes do successfully build:
 
 ```yaml
 # .github/workflows/ci.yml
@@ -59,7 +51,7 @@ jobs:
 
 ### Release
 
-Projects that build and attach artifacts (e.g. `baseGenerator`, `osrsIconPixelModels`):
+Projects that build and attach artifacts:
 
 ```yaml
 # .github/workflows/release.yml
@@ -78,7 +70,7 @@ jobs:
     uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.2.3
 ```
 
-Projects that only version and release, without build artifacts (e.g. `dfCharacterBuilder`, `twoPointFiveD`):
+Projects that only version and release, without build artifacts:
 
 ```yaml
 # .github/workflows/release.yml
