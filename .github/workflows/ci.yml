@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Python version used to run buildscad"
+        type: string
+        required: false
+        default: "3.13"
+      buildscad_version:
+        description: "buildscad version (git tag) to install"
+        type: string
+        required: false
+        default: "v1.4.1"
+      openscad:
+        description: "OpenSCAD snap package to install (openscad or openscad-nightly)"
+        type: string
+        required: false
+        default: "openscad"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install OpenSCAD
+        run: sudo snap install ${{ inputs.openscad }}
+
+      - name: Install buildscad
+        run: |
+          git clone https://github.com/dduxx/buildscad /tmp/buildscad
+          cd /tmp/buildscad
+          git checkout ${{ inputs.buildscad_version }}
+          pip install -e .
+
+      - name: Build
+        run: buildscad build

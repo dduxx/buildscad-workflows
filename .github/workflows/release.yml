@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Python version used to run buildscad"
+        type: string
+        required: false
+        default: "3.13"
+      buildscad_version:
+        description: "buildscad version (git tag) to install"
+        type: string
+        required: false
+        default: "v1.4.1"
+      openscad:
+        description: "OpenSCAD snap package to install (openscad or openscad-nightly)"
+        type: string
+        required: false
+        default: "openscad"
+      build_artifacts:
+        description: "Build and attach the build/ directory to the release"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install OpenSCAD
+        run: sudo snap install ${{ inputs.openscad }}
+
+      - name: Install buildscad
+        run: |
+          git clone https://github.com/dduxx/buildscad /tmp/buildscad
+          cd /tmp/buildscad
+          git checkout ${{ inputs.buildscad_version }}
+          pip install -e .
+
+      - name: Determine next version
+        id: version
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LAST_VERSION=${LAST_TAG#v}
+          COMMITS=$([ "$LAST_TAG" = "v0.0.0" ] && git log --pretty=format:"%s" || git log "${LAST_TAG}..HEAD" --pretty=format:"%s")
+
+          if ! echo "$COMMITS" | grep -qE '(fix|feat|perf)(\([^)]+\))?:|BREAKING CHANGE|^[a-z]+(\([^)]+\))?!:'; then
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            echo "No version-affecting commits since ${LAST_TAG}; skipping release."
+            exit 0
+          fi
+
+          MAJOR=0; MINOR=0; PATCH=0
+          if echo "$COMMITS" | grep -qE '(BREAKING CHANGE|^[a-z]+(\([^)]+\))?!:)'; then
+            MAJOR=1
+          elif echo "$COMMITS" | grep -qE '^feat(\([^)]+\))?:'; then
+            MINOR=1
+          else
+            PATCH=1
+          fi
+
+          IFS='.' read -r MAJ_CUR MIN_CUR PAT_CUR <<< "$LAST_VERSION"
+          MAJ_CUR=${MAJ_CUR:-0}; MIN_CUR=${MIN_CUR:-0}; PAT_CUR=${PAT_CUR:-0}
+
+          NEW_MAJ=$((MAJ_CUR + MAJOR))
+          NEW_MIN=$((MIN_CUR + MINOR))
+          NEW_PAT=$((PAT_CUR + PATCH))
+
+          if [ "$MAJOR" -eq 1 ]; then NEW_MIN=0; NEW_PAT=0; fi
+          if [ "$MINOR" -eq 1 ]; then NEW_PAT=0; fi
+
+          NEW_VERSION="${NEW_MAJ}.${NEW_MIN}.${NEW_PAT}"
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${NEW_VERSION}"
+
+      - name: Update version and commit
+        if: steps.version.outputs.skip_release != 'true'
+        run: |
+          sed -i "s/^BUILDSCAD_VERSION=.*/BUILDSCAD_VERSION=${{ steps.version.outputs.new_version }}/" buildscad.properties
+          git add buildscad.properties
+          if git diff --cached --quiet; then
+            echo "No version change to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          fi
+
+      - name: Tag and push
+        if: steps.version.outputs.skip_release != 'true'
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin main --tags
+
+      - name: Build
+        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
+        run: buildscad build
+
+      - name: Zip build artifacts
+        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
+        run: zip -r v${{ steps.version.outputs.new_version }}.zip build/
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.skip_release != 'true' && !inputs.build_artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ steps.version.outputs.tag }} --generate-notes --title "${{ steps.version.outputs.tag }}"
+
+      - name: Create GitHub Release with artifacts
+        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ steps.version.outputs.tag }} v${{ steps.version.outputs.new_version }}.zip --generate-notes --title "${{ steps.version.outputs.tag }}"
