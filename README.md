@@ -46,7 +46,7 @@ on:
 
 jobs:
   ci:
-    uses: dduxx/buildscad-workflows/.github/workflows/ci.yml@v1.2.3
+    uses: dduxx/buildscad-workflows/.github/workflows/ci.yml@v1.0.1
 ```
 
 ### Release
@@ -67,7 +67,7 @@ jobs:
     if: github.event.pull_request.merged == true
     permissions:
       contents: write
-    uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.2.3
+    uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.0.1
 ```
 
 Projects that only version and release, without build artifacts:
@@ -86,7 +86,7 @@ jobs:
     if: github.event.pull_request.merged == true
     permissions:
       contents: write
-    uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.2.3
+    uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.0.1
     with:
       build_artifacts: false
 ```
