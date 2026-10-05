@@ -16,7 +16,7 @@ Shared GitHub reusable workflows for [buildscad](https://github.com/dduxx/builds
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `python_version` | string | `"3.13"` | Python version used to run buildscad |
-| `buildscad_version` | string | `"v1.4.1"` | buildscad version (git tag) to install |
+| `buildscad_version` | string | `"v1.4.2"` | buildscad version (git tag) to install |
 | `openscad` | string | `"openscad"` | OpenSCAD snap package (`openscad` or `openscad-nightly`) |
 
 ### `release.yml`
@@ -24,7 +24,7 @@ Shared GitHub reusable workflows for [buildscad](https://github.com/dduxx/builds
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `python_version` | string | `"3.13"` | Python version used to run buildscad |
-| `buildscad_version` | string | `"v1.4.1"` | buildscad version (git tag) to install |
+| `buildscad_version` | string | `"v1.4.2"` | buildscad version (git tag) to install |
 | `openscad` | string | `"openscad"` | OpenSCAD snap package (`openscad` or `openscad-nightly`) |
 | `build_artifacts` | boolean | `true` | Build and attach the `build/` directory to the release |
 

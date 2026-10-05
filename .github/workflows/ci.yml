@@ -12,7 +12,7 @@ on:
         description: "buildscad version (git tag) to install"
         type: string
         required: false
-        default: "v1.4.1"
+        default: "v1.4.2"
       openscad:
         description: "OpenSCAD snap package to install (openscad or openscad-nightly)"
         type: string
