@@ -1,0 +1,99 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Python version used to run buildscad"
+        type: string
+        required: false
+        default: "3.13"
+      buildscad_version:
+        description: "buildscad version (git tag) to install"
+        type: string
+        required: false
+        default: "v1.5.0"
+      openscad:
+        description: "OpenSCAD snap package to install (openscad or openscad-nightly)"
+        type: string
+        required: false
+        default: "openscad"
+      filter:
+        description: "Glob filter to select which assemblies to build"
+        type: string
+        required: false
+        default: ""
+      name:
+        description: "Optional name prefix for the output zip archive"
+        type: string
+        required: false
+        default: ""
+      version:
+        description: "Version used in the zip archive name (falls back to BUILDSCAD_VERSION)"
+        type: string
+        required: false
+        default: ""
+      zip_artifacts:
+        description: "Build and zip the build/ directory into an archive"
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      zip_name:
+        description: "Name of the produced zip archive (without .zip extension)"
+        value: ${{ jobs.build.outputs.zip_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      zip_name: ${{ steps.zip.outputs.zip_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install OpenSCAD
+        run: sudo snap install ${{ inputs.openscad }}
+
+      - name: Install buildscad
+        run: |
+          git clone https://github.com/dduxx/buildscad /tmp/buildscad
+          cd /tmp/buildscad
+          git checkout ${{ inputs.buildscad_version }}
+          pip install -e .
+
+      - name: Build
+        run: |
+          if [ -n "${{ inputs.filter }}" ]; then
+            buildscad build -f "${{ inputs.filter }}"
+          else
+            buildscad build
+          fi
+
+      - name: Zip build artifacts
+        id: zip
+        if: inputs.zip_artifacts
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep '^BUILDSCAD_VERSION=' buildscad.properties | cut -d'=' -f2)
+          fi
+          ZIP_NAME="v${VERSION}"
+          if [ -n "${{ inputs.name }}" ]; then
+            ZIP_NAME="${{ inputs.name }}_${ZIP_NAME}"
+          fi
+          zip -r "${ZIP_NAME}.zip" build/
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        if: inputs.zip_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.zip.outputs.zip_name }}
+          path: ${{ steps.zip.outputs.zip_name }}.zip
