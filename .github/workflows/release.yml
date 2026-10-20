@@ -12,7 +12,7 @@ on:
         description: "buildscad version (git tag) to install"
         type: string
         required: false
-        default: "v1.4.2"
+        default: "v1.5.0"
       openscad:
         description: "OpenSCAD snap package to install (openscad or openscad-nightly)"
         type: string
@@ -23,13 +23,22 @@ on:
         type: boolean
         required: false
         default: true
+      artifacts:
+        description: "JSON array of artifacts to build, each with optional 'filter' (glob) and 'name' (zip prefix)"
+        type: string
+        required: false
+        default: '[{"filter":"","name":""}]'
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      tag: ${{ steps.version.outputs.tag }}
+      skip_release: ${{ steps.version.outputs.skip_release }}
 
     steps:
       - name: Checkout
@@ -37,25 +46,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ inputs.python_version }}
-
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Install OpenSCAD
-        run: sudo snap install ${{ inputs.openscad }}
-
-      - name: Install buildscad
-        run: |
-          git clone https://github.com/dduxx/buildscad /tmp/buildscad
-          cd /tmp/buildscad
-          git checkout ${{ inputs.buildscad_version }}
-          pip install -e .
 
       - name: Determine next version
         id: version
@@ -111,24 +105,45 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin main --tags
 
-      - name: Build
-        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
-        run: buildscad build
+  build:
+    needs: version
+    if: needs.version.outputs.skip_release != 'true' && inputs.build_artifacts
+    strategy:
+      matrix:
+        artifact: ${{ fromJSON(inputs.artifacts) }}
+    uses: ./.github/workflows/build.yml
+    with:
+      python_version: ${{ inputs.python_version }}
+      buildscad_version: ${{ inputs.buildscad_version }}
+      openscad: ${{ inputs.openscad }}
+      filter: ${{ matrix.artifact.filter }}
+      name: ${{ matrix.artifact.name }}
+      version: ${{ needs.version.outputs.new_version }}
+      zip_artifacts: true
 
-      - name: Zip build artifacts
-        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
-        run: zip -r v${{ steps.version.outputs.new_version }}.zip build/
+  release:
+    needs: [version, build]
+    if: needs.version.outputs.skip_release != 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        if: inputs.build_artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: Create GitHub Release
-        if: steps.version.outputs.skip_release != 'true' && !inputs.build_artifacts
+        if: '!inputs.build_artifacts'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ steps.version.outputs.tag }} --generate-notes --title "${{ steps.version.outputs.tag }}"
+          gh release create ${{ needs.version.outputs.tag }} --generate-notes --title "${{ needs.version.outputs.tag }}"
 
       - name: Create GitHub Release with artifacts
-        if: steps.version.outputs.skip_release != 'true' && inputs.build_artifacts
+        if: inputs.build_artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ steps.version.outputs.tag }} v${{ steps.version.outputs.new_version }}.zip --generate-notes --title "${{ steps.version.outputs.tag }}"
+          gh release create ${{ needs.version.outputs.tag }} artifacts/*.zip --generate-notes --title "${{ needs.version.outputs.tag }}"

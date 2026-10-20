@@ -7,6 +7,7 @@ Shared GitHub reusable workflows for [buildscad](https://github.com/dduxx/builds
 | Workflow | Purpose |
 |----------|---------|
 | [`ci.yml`](.github/workflows/ci.yml) | Builds the project on pull requests |
+| [`build.yml`](.github/workflows/build.yml) | Builds (optionally with a glob filter) and optionally zips the `build/` directory |
 | [`release.yml`](.github/workflows/release.yml) | Tags, bumps `buildscad.properties`, and publishes a release on merge to `main` |
 
 ## Inputs
@@ -16,17 +17,30 @@ Shared GitHub reusable workflows for [buildscad](https://github.com/dduxx/builds
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `python_version` | string | `"3.13"` | Python version used to run buildscad |
-| `buildscad_version` | string | `"v1.4.2"` | buildscad version (git tag) to install |
+| `buildscad_version` | string | `"v1.5.0"` | buildscad version (git tag) to install |
 | `openscad` | string | `"openscad"` | OpenSCAD snap package (`openscad` or `openscad-nightly`) |
+
+### `build.yml`
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `python_version` | string | `"3.13"` | Python version used to run buildscad |
+| `buildscad_version` | string | `"v1.5.0"` | buildscad version (git tag) to install |
+| `openscad` | string | `"openscad"` | OpenSCAD snap package (`openscad` or `openscad-nightly`) |
+| `filter` | string | `""` | Glob filter to select which assemblies to build |
+| `name` | string | `""` | Optional name prefix for the output zip archive |
+| `version` | string | `""` | Version used in the zip name (falls back to `BUILDSCAD_VERSION`) |
+| `zip_artifacts` | boolean | `false` | Build and zip the `build/` directory into an archive |
 
 ### `release.yml`
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `python_version` | string | `"3.13"` | Python version used to run buildscad |
-| `buildscad_version` | string | `"v1.4.2"` | buildscad version (git tag) to install |
+| `buildscad_version` | string | `"v1.5.0"` | buildscad version (git tag) to install |
 | `openscad` | string | `"openscad"` | OpenSCAD snap package (`openscad` or `openscad-nightly`) |
 | `build_artifacts` | boolean | `true` | Build and attach the `build/` directory to the release |
+| `artifacts` | string | `'[{"filter":"","name":""}]'` | JSON array of artifacts to build, each with optional `filter` (glob) and `name` (zip prefix) |
 
 ## Usage
 
@@ -92,6 +106,52 @@ jobs:
 ```
 
 To use OpenSCAD nightly instead of stable, add `with: { openscad: openscad-nightly }`.
+
+### Build
+
+Projects that want a standalone build (optionally filtered and zipped) outside of a release:
+
+```yaml
+# .github/workflows/build.yml
+name: Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: dduxx/buildscad-workflows/.github/workflows/build.yml@v1.0.1
+    with:
+      filter: "scad/group1/*.scad"
+      name: group1
+      zip_artifacts: true
+```
+
+### Multiple release artifacts
+
+Large projects can build several filtered archives in parallel and attach them all to a single release by passing a JSON array of `{filter, name}` objects:
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: write
+    uses: dduxx/buildscad-workflows/.github/workflows/release.yml@v1.0.1
+    with:
+      artifacts: '[{"filter":"scad/group1/*.scad","name":"group1"},{"filter":"scad/group2/*.scad","name":"group2"}]'
+```
+
+Each entry produces a zip named `<name>_v<version>.zip` (e.g. `group1_v1.2.3.zip`). When `name` is omitted, the archive is named `v<version>.zip`.
+
 
 ## Versioning
 
