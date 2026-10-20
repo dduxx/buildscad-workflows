@@ -138,6 +138,7 @@ jobs:
         if: '!inputs.build_artifacts'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create ${{ needs.version.outputs.tag }} --generate-notes --title "${{ needs.version.outputs.tag }}"
 
@@ -145,5 +146,6 @@ jobs:
         if: inputs.build_artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create ${{ needs.version.outputs.tag }} artifacts/*.zip --generate-notes --title "${{ needs.version.outputs.tag }}"
